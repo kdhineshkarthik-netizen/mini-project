@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "launch": "start-app.bat",
+    "shortcut": "cscript //nologo create-desktop-shortcut.vbs"
   },
   "dependencies": {
     "express": "^4.19.2",

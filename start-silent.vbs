@@ -1,10 +1,29 @@
 Set WshShell = CreateObject("WScript.Shell")
+Set fso = CreateObject("Scripting.FileSystemObject")
+
 Dim scriptDir
-scriptDir = CreateObject("Scripting.FileSystemObject").GetParentFolderName(WScript.ScriptFullName)
+scriptDir = fso.GetParentFolderName(WScript.ScriptFullName)
 
-' Run npm start silently in background
-WshShell.Run "cmd /c cd /d """ & scriptDir & """ && npm start", 0, False
+' Check if Node server is listening on port 3000
+Function IsServerRunning()
+    Dim execObj
+    Set execObj = WshShell.Exec("cmd /c netstat -ano | findstr :3000")
+    IsServerRunning = Not execObj.StdOut.AtEndOfStream
+End Function
 
-' Wait 2 seconds for server to initialize then open browser
-WScript.Sleep 2000
+' If server is not running, start node server.js silently in background
+If Not IsServerRunning() Then
+    WshShell.Run "cmd /c cd /d """ & scriptDir & """ && node server.js", 0, False
+    
+    ' Wait until server port 3000 is listening (max 10 seconds)
+    Dim attempts
+    attempts = 0
+    Do While Not IsServerRunning() And attempts < 20
+        WScript.Sleep 500
+        attempts = attempts + 1
+    Loop
+End If
+
+' Open application in default web browser
 WshShell.Run "http://localhost:3000"
+

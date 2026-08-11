@@ -18,17 +18,6 @@ const alertCooldowns = new Map();
 // Middleware
 app.use(cors());
 app.use(express.json());
-
-// Main Staff POS & Inventory System
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// Student Mobile Live Stock Portal (No login required)
-app.get('/student', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'student.html'));
-});
-
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ==========================================
@@ -98,76 +87,6 @@ app.post('/api/auth/login', async (req, res) => {
 
 app.get('/api/auth/me', authenticateToken, (req, res) => {
   res.json({ user: req.user });
-});
-
-// ==========================================
-// PUBLIC STUDENT MOBILE APP API ENDPOINTS
-// ==========================================
-app.get('/api/public/products', async (req, res) => {
-  try {
-    const { search, category } = req.query;
-    let sql = 'SELECT id, barcode, name, category, price, stock_quantity, low_stock_threshold FROM products WHERE 1=1';
-    const params = [];
-
-    if (search) {
-      sql += ' AND (barcode LIKE ? OR name LIKE ? OR category LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
-    }
-
-    if (category && category !== 'All') {
-      sql += ' AND category = ?';
-      params.push(category);
-    }
-
-    sql += ' ORDER BY name ASC';
-    const products = await all(sql, params);
-
-    const formattedProducts = products.map(p => {
-      let status = 'IN_STOCK';
-      if (p.stock_quantity <= 0) {
-        status = 'OUT_OF_STOCK';
-      } else if (p.stock_quantity <= (p.low_stock_threshold || 5)) {
-        status = 'LOW_STOCK';
-      }
-      return {
-        ...p,
-        stock_status: status
-      };
-    });
-
-    res.json(formattedProducts);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/public/categories', async (req, res) => {
-  try {
-    const rows = await all('SELECT DISTINCT category FROM products ORDER BY category ASC');
-    res.json(rows.map(r => r.category));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/public/store-info', async (req, res) => {
-  try {
-    const totalItemsRow = await get('SELECT COUNT(*) as count FROM products');
-    const outOfStockRow = await get('SELECT COUNT(*) as count FROM products WHERE stock_quantity <= 0');
-    const lowStockRow = await get('SELECT COUNT(*) as count FROM products WHERE stock_quantity > 0 AND stock_quantity <= low_stock_threshold');
-    
-    res.json({
-      storeName: 'A.V.C. College Cooperative Store',
-      operatingHours: '8:30 AM - 5:30 PM (Mon-Sat)',
-      announcement: '📢 Live Stock Updates for Campus Students. Check stock availability on your phone before visiting the store!',
-      totalProducts: totalItemsRow ? totalItemsRow.count : 0,
-      outOfStockCount: outOfStockRow ? outOfStockRow.count : 0,
-      lowStockCount: lowStockRow ? lowStockRow.count : 0,
-      lastUpdated: new Date().toISOString()
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
 });
 
 // ==========================================
@@ -552,6 +471,9 @@ async function sendNodemailerEmail(smtpHost, smtpPort, smtpUser, smtpPass, admin
       host: smtpHost || 'smtp.gmail.com',
       port: parseInt(smtpPort) || 587,
       secure: false,
+      connectionTimeout: 3000, // 3s fast fail for offline mode
+      greetingTimeout: 3000,
+      socketTimeout: 3000,
       auth: {
         user: smtpUser,
         pass: smtpPass
